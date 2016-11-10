@@ -1,0 +1,7 @@
+resolver: lts-7.8
+packages:
+- '.'
+extra-deps:
+- pqueue-1.3.2
+flags: {}
+extra-package-dbs: []
