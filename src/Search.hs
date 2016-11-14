@@ -2,6 +2,7 @@
 
 module Search (initSearch, update) where
 
+import Console
 import qualified Data.PQueue.Min as PQ
 import qualified Data.Set as Set
 import Grid
@@ -19,22 +20,30 @@ initSearch searchType start goal = Searching
     , parent = Nothing }
   , expanded = Set.empty }
 
-update :: State -> State
-update state = update' state 1
+update :: State -> IO State
+update state = update' state 0
 
-update' :: State -> Double -> State
+update' :: State -> Double -> IO State
 update' state@(State {..}) count
   | Started {..} <- search, Searching {..} <- searchData, active =
     case PQ.minView fringe of
-      Nothing -> setSearchData NoPath $ updateFringeList state
+      Nothing -> do
+        setPathCount "No path found"
+        setExpandedCount $ show $ Set.size expanded
+        setFringeCount $ show $ PQ.size fringe
+        return $ setSearchData NoPath $ updateFringeList state
       Just ((PQNode current), fringe')
         | Set.member current expanded ->
           update' (setSearchData (searchData { fringe = fringe' }) state) count
-        | coords current == goal ->
+        | coords current == goal -> do
           let buildPath prev path = case parent prev of
                 Just node -> buildPath node $ coords prev : path
                 Nothing -> coords prev : path
-          in  setSearchData (FoundPath $ buildPath current []) $ updateFringeList state
+              result = buildPath current []
+          setPathCount $ show $ length result
+          setExpandedCount $ show $ Set.size expanded
+          setFringeCount $ show $ PQ.size fringe
+          return $ setSearchData (FoundPath result) $ updateFringeList state
         | otherwise ->
           let adjacent =
                 let (x, y) = coords current
@@ -66,9 +75,12 @@ update' state@(State {..}) count
                 , searchData = searchData
                   { fringe = fringe'', expanded = expanded' } }
           in  if count >= speed
-            then updateFringeList state
+            then do
+              setExpandedCount $ show $ Set.size expanded'
+              setFringeCount $ show $ PQ.size fringe''
+              return $ updateFringeList state
             else update' (state { search = search' }) (count + 1)
-  | otherwise = state
+  | otherwise = return state
 
 setSearchData :: SearchData -> State -> State
 setSearchData searchData' state = state
